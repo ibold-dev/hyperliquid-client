@@ -1,0 +1,3 @@
+[submodule "lib/hyperliquid-python-sdk"]
+	path = lib/hyperliquid-python-sdk
+	url = https://github.com/hyperliquid-dex/hyperliquid-python-sdk.git
