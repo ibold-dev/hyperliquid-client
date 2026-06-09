@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyperliquid-client"
+version = "0.1.0"
+description = "A client for Hyperliquid"
+authors = [{ name = "0xdefiprof", email = "thedefiprof@proton.me" }]
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/ibold-dev/hyperliquid-client"
