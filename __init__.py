@@ -1,3 +1,0 @@
-"""
-Hyperliquid Client Package
-"""
