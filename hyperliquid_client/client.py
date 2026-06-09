@@ -122,6 +122,92 @@ class HyperliquidClient:
             slippage=slippage
         )
 
+    def place_stop_order(
+        self,
+        coin: str,
+        is_buy: bool,
+        sz: float,
+        trigger_px: float,
+        is_market: bool = True,
+        is_take_profit: bool = False
+    ) -> dict:
+        """
+        Place a standalone Stop Loss (SL) or Take Profit (TP) order.
+        """
+        tpsl = "tp" if is_take_profit else "sl"
+        order_type = {
+            "trigger": {
+                "triggerPx": trigger_px,
+                "isMarket": is_market,
+                "tpsl": tpsl
+            }
+        }
+        
+        return self.exchange.order(
+            coin,
+            is_buy,
+            sz,
+            trigger_px, # execution price (used as limit price if isMarket=False, else acts as a fallback for the engine)
+            order_type=order_type,
+            reduce_only=True
+        )
+
+    def place_order_with_tpsl(
+        self,
+        coin: str,
+        is_buy: bool,
+        sz: float,
+        limit_px: float,
+        tp_px: float = None,
+        sl_px: float = None
+    ) -> dict:
+        """
+        Place a limit order with an attached Take Profit and/or Stop Loss order.
+        These orders are grouped together ('normalTpsl').
+        """
+        orders = [{
+            "coin": coin,
+            "is_buy": is_buy,
+            "sz": sz,
+            "limit_px": limit_px,
+            "order_type": {"limit": {"tif": "Gtc"}},
+            "reduce_only": False,
+        }]
+        
+        if tp_px is not None:
+            orders.append({
+                "coin": coin,
+                "is_buy": not is_buy,
+                "sz": sz,
+                "limit_px": tp_px,
+                "order_type": {
+                    "trigger": {
+                        "isMarket": True,
+                        "triggerPx": tp_px,
+                        "tpsl": "tp",
+                    }
+                },
+                "reduce_only": True,
+            })
+            
+        if sl_px is not None:
+            orders.append({
+                "coin": coin,
+                "is_buy": not is_buy,
+                "sz": sz,
+                "limit_px": sl_px,
+                "order_type": {
+                    "trigger": {
+                        "isMarket": True,
+                        "triggerPx": sl_px,
+                        "tpsl": "sl",
+                    }
+                },
+                "reduce_only": True,
+            })
+            
+        return self.exchange.bulk_orders(orders, grouping="normalTpsl")
+
     def cancel_order(self, coin: str, oid: int) -> dict:
         """
         Cancel a specific order.
