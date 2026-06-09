@@ -27,22 +27,29 @@ class OpenOrdersTab(Vertical):
             Button("Cancel All", id="cancel_all_orders", variant="error"),
             classes="buttons-bar"
         )
-        yield DataTable(id="orders_table")
+        yield Label("💡 Click/Enter on a row below to cancel that specific order", classes="section-title")
+        yield DataTable(id="orders_table", cursor_type="row")
 
 class TradeTab(Vertical):
     def compose(self) -> ComposeResult:
         yield Input(placeholder="Coin (e.g. ETH, PURR/USDC)", id="trade_coin")
-        yield Select(
-            options=[("Buy", True), ("Sell", False)],
-            prompt="Side",
-            id="trade_side"
+        yield Horizontal(
+            Select(
+                options=[("Limit", "limit"), ("Market", "market"), ("Stop Loss", "sl"), ("Take Profit", "tp")],
+                prompt="Order Type",
+                value="limit",
+                id="trade_order_type"
+            ),
+            Select(
+                options=[("Buy/Long", True), ("Sell/Short", False)],
+                prompt="Side",
+                id="trade_side"
+            )
         )
         yield Input(placeholder="Size (e.g. 0.01)", id="trade_size", type="number")
-        yield Input(placeholder="Limit Price", id="trade_limit_px", type="number")
-        yield Horizontal(
-            Input(placeholder="Take Profit Price (Optional)", id="trade_tp", type="number"),
-            Input(placeholder="Stop Loss Price (Optional)", id="trade_sl", type="number")
-        )
+        yield Input(placeholder="Price / Trigger Price (Leave blank for Market)", id="trade_limit_px", type="number")
+        yield Input(placeholder="Attach Take Profit (Optional, Limit orders only)", id="trade_tp", type="number")
+        yield Input(placeholder="Attach Stop Loss (Optional, Limit orders only)", id="trade_sl", type="number")
         yield Button("Execute Order", id="execute_order", variant="success")
 
 class HyperliquidTUI(App):
@@ -209,36 +216,66 @@ class HyperliquidTUI(App):
         except Exception as e:
             self.log_msg(f"[red]Error canceling orders: {e}[/red]")
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id == "orders_table":
+            row_data = event.data_table.get_row(event.row_key)
+            oid = int(row_data[0])
+            coin = row_data[1]
+            self.log_msg(f"Canceling order {oid} for {coin}...")
+            self.run_worker(self._cancel_single_order(coin, oid), exclusive=True)
+
+    async def _cancel_single_order(self, coin: str, oid: int):
+        try:
+            res = await asyncio.to_thread(self.client.cancel_order, coin, oid)
+            self.log_msg(f"[yellow]Cancel Response:[/yellow] {res}")
+            self.refresh_orders()
+        except Exception as e:
+            self.log_msg(f"[red]Error canceling order: {e}[/red]")
+
     def execute_order(self):
         coin = self.query_one("#trade_coin", Input).value
         is_buy_val = self.query_one("#trade_side", Select).value
+        order_type_val = self.query_one("#trade_order_type", Select).value
         size_str = self.query_one("#trade_size", Input).value
         limit_px_str = self.query_one("#trade_limit_px", Input).value
         tp_str = self.query_one("#trade_tp", Input).value
         sl_str = self.query_one("#trade_sl", Input).value
         
-        if not coin or is_buy_val == Select.BLANK or not size_str or not limit_px_str:
-            self.log_msg("[red]Please fill in all required fields (Coin, Side, Size, Limit Price)[/red]")
+        if not coin or is_buy_val == Select.BLANK or not size_str:
+            self.log_msg("[red]Please fill in all required fields (Coin, Side, Size)[/red]")
             return
             
         try:
             is_buy = bool(is_buy_val)
             sz = float(size_str)
-            limit_px = float(limit_px_str)
+            limit_px = float(limit_px_str) if limit_px_str else None
             tp_px = float(tp_str) if tp_str else None
             sl_px = float(sl_str) if sl_str else None
             
-            self.log_msg(f"Executing order for {coin}...")
-            self.run_worker(self._execute_order(coin, is_buy, sz, limit_px, tp_px, sl_px), exclusive=True)
+            self.log_msg(f"Executing {order_type_val} order for {coin}...")
+            self.run_worker(self._execute_order(coin, is_buy, order_type_val, sz, limit_px, tp_px, sl_px), exclusive=True)
         except Exception as e:
             self.log_msg(f"[red]Invalid input: {e}[/red]")
             
-    async def _execute_order(self, coin, is_buy, sz, limit_px, tp_px, sl_px):
+    async def _execute_order(self, coin, is_buy, order_type, sz, limit_px, tp_px, sl_px):
         try:
-            if tp_px or sl_px:
-                res = await asyncio.to_thread(self.client.place_order_with_tpsl, coin, is_buy, sz, limit_px, tp_px, sl_px)
-            else:
-                res = await asyncio.to_thread(self.client.place_limit_order, coin, is_buy, sz, limit_px)
+            if order_type == "market":
+                res = await asyncio.to_thread(self.client.place_market_order, coin, is_buy, sz)
+            elif order_type in ["sl", "tp"]:
+                if limit_px is None:
+                    self.log_msg("[red]Trigger Price is required for Stop Loss / Take Profit orders[/red]")
+                    return
+                is_tp = (order_type == "tp")
+                res = await asyncio.to_thread(self.client.place_stop_order, coin, is_buy, sz, limit_px, True, is_tp)
+            else: # limit
+                if limit_px is None:
+                    self.log_msg("[red]Limit Price is required for Limit orders[/red]")
+                    return
+                if tp_px or sl_px:
+                    res = await asyncio.to_thread(self.client.place_order_with_tpsl, coin, is_buy, sz, limit_px, tp_px, sl_px)
+                else:
+                    res = await asyncio.to_thread(self.client.place_limit_order, coin, is_buy, sz, limit_px)
+            
             self.log_msg(f"[green]Order Executed:[/green] {res}")
             self.refresh_orders()
         except Exception as e:
