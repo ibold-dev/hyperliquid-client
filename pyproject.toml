@@ -14,7 +14,8 @@ classifiers = [
 ]
 dependencies = [
     "hyperliquid-python-sdk",
-    "python-dotenv"
+    "python-dotenv",
+    "textual"
 ]
 
 [project.urls]
