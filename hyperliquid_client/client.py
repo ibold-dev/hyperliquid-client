@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
 from hyperliquid.utils import constants
-from hyperliquid.utils.types import OrderType
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ class HyperliquidClient:
         :param reduce_only: Whether the order is reduce only
         :param tif: Time in force, typically "Gtc", "Ioc", or "Alo"
         """
-        order_type: OrderType = {"limit": {"tif": tif}}
+        order_type: dict = {"limit": {"tif": tif}}
         return self.exchange.order(
             coin, 
             is_buy, 

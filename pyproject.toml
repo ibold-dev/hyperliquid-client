@@ -13,9 +13,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "hyperliquid-python-sdk @ file://./lib/hyperliquid-python-sdk",
+    "hyperliquid-python-sdk",
     "python-dotenv"
 ]
 
 [project.urls]
 Homepage = "https://github.com/ibold-dev/hyperliquid-client"
+
+[tool.setuptools]
+packages = ["hyperliquid_client"]

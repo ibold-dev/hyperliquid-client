@@ -5,9 +5,10 @@ A lightweight, customized Python wrapper around the official `hyperliquid-python
 ## Setup
 
 1. **Install the package locally**
-   Using pip, install this wrapper which will automatically link the local SDK dependency:
+   First, install the local SDK dependency, then install the wrapper:
    ```bash
-   pip install -e .
+   pip3 install -e ./lib/hyperliquid-python-sdk
+   pip3 install -e .
    ```
 
 2. **Configure Environment Variables**
